@@ -2,7 +2,7 @@
 #include <WiFi.h>
 #include <WebServer.h>
 
-#define CAN_TX 10
+#define CAN_TX 21
 #define CAN_RX 20
 const char* AP_SSID = "Vehicle-OBD";
 const char* AP_PASS = "!secret_wifi_password";
@@ -33,7 +33,7 @@ struct Telemetry {
   bool     forcedEco, smartEco;
   bool     seatLock, chargerLock1, chargerLock2;
   bool     chargerConnected;
-  // ===== ADDITIONAL fields =====
+  // ===== Additional fields =====
   int16_t  cellTemp[5];
   int16_t  afeDieTemp, packCurrent;
   int16_t  humidity, bmsAmbient;
@@ -44,9 +44,6 @@ struct Telemetry {
   uint16_t soe, socEkf, maxSoc, minSocEst;
   int16_t  minV1Est, minV2Est;
   uint16_t cellSoc[14];
-  uint16_t boardTempRefV, vref2, vref3, mosfetPwrV, afeVreg;
-  int16_t  imuAccX, imuAccY, imuAccZ;
-  int16_t  eulerRoll, eulerPitch, eulerHeading;
   uint32_t odometer;
   uint8_t  bmsHwVer, bmsFw[3], bcmFw[3], gtwFw[3], motorFw[3];
   char     binId[16];
@@ -220,10 +217,6 @@ async function updateExtra(){
   st('xv1',(j.v1/10000).toFixed(4)+' V'); st('xv2',(j.v2/10000).toFixed(4)+' V');
   st('xdd',A(j.dd)); st('xdc',A(j.dc)); st('xdr',A(j.dr)); st('xdl',(j.dl/100).toFixed(2));
   st('xcr',(j.cr/100).toFixed(2)); st('xcrl',(j.crl/100).toFixed(2)); st('xcpq',(j.cpq/100).toFixed(2));
-  st('xbtr',(j.btr/1000).toFixed(3)+' V'); st('xvr2',(j.vr2/10000).toFixed(4)+' V'); st('xvr3',(j.vr3/10000).toFixed(4)+' V');
-  st('xmos',(j.mos/1000).toFixed(3)+' V'); st('xvreg',(j.vreg/1000).toFixed(3)+' V');
-  st('xax',j.ax); st('xay',j.ay); st('xaz',j.az);
-  st('xer',(j.er/10000).toFixed(4)+' \u00B0'); st('xep',(j.ep/10000).toFixed(4)+' \u00B0'); st('xeh',(j.eh/10000).toFixed(4)+' \u00B0');
   st('xodo',(j.odo/1000).toFixed(1)+' km'); st('xbhw',j.bhw);
   const V=a=>a[0]+'.'+a[1]+'.'+a[2];
   st('xbfw',V(j.bfw)); st('xcfw',V(j.cfw)); st('xgfw',V(j.gfw)); st('xmfw',V(j.mfw));
@@ -236,7 +229,7 @@ setInterval(updateExtra,1500);
 setInterval(updateOthers,1500);
 window.onload=function(){showTab('dash');};
 </script></head><body>
-<header><h1>&#9889; Vehicle OBD Scanner v5</h1><p style="margin:6px 0 0;color:var(--muted);font-size:13px;">Developed by Unknown contributors </p></header>
+<header><h1>&#9889; Vehicle OBD Scanner v5</h1><p style="margin:6px 0 0;color:var(--muted);font-size:13px;">Developed by Open contributors </p></header>
 <div class="tabs">
 <button class="tab active" id="tb_dash" onclick="showTab('dash')">Dashboard</button>
 <button class="tab" id="tb_cells" onclick="showTab('cells')">Cell Info</button>
@@ -329,7 +322,7 @@ window.onload=function(){showTab('dash');};
 <tr><td>ECI Temp (probable)</td><td class='v' id='xeci'>--</td></tr>
 <tr><td>Sense Resistor Temp (probable)</td><td class='v' id='xsr'>--</td></tr>
 </table></div>
-<div class="card"><h2>Battery (Extra)</h2>
+<div class="card"><h2>Battery (Additional)</h2>
 <table>
 <tr><td>Pack Current</td><td class='v' id='xci'>--</td></tr>
 <tr><td>State of Energy (SoE)</td><td class='v' id='xsoe'>--</td></tr>
@@ -348,23 +341,6 @@ window.onload=function(){showTab('dash');};
 <tr><td>ChgAlg I CellRule</td><td class='v' id='xcr'>--</td></tr>
 <tr><td>ChgAlg I Cmd Rate Limited</td><td class='v' id='xcrl'>--</td></tr>
 <tr><td>ChgAlg I Post Quantizer</td><td class='v' id='xcpq'>--</td></tr>
-</table></div>
-<div class="card"><h2>Reference Voltages</h2>
-<table>
-<tr><td>Board Temp Ref V</td><td class='v' id='xbtr'>--</td></tr>
-<tr><td>VREF2</td><td class='v' id='xvr2'>--</td></tr>
-<tr><td>VREF3</td><td class='v' id='xvr3'>--</td></tr>
-<tr><td>MOSFET PWR V</td><td class='v' id='xmos'>--</td></tr>
-<tr><td>AFE VREG V</td><td class='v' id='xvreg'>--</td></tr>
-</table></div>
-<div class="card"><h2>IMU</h2>
-<table>
-<tr><td>Acc X (raw)</td><td class='v' id='xax'>--</td></tr>
-<tr><td>Acc Y (raw)</td><td class='v' id='xay'>--</td></tr>
-<tr><td>Acc Z (raw)</td><td class='v' id='xaz'>--</td></tr>
-<tr><td>Euler Roll</td><td class='v' id='xer'>--</td></tr>
-<tr><td>Euler Pitch</td><td class='v' id='xep'>--</td></tr>
-<tr><td>Euler Heading</td><td class='v' id='xeh'>--</td></tr>
 </table></div>
 <div class="card"><h2>Vehicle &amp; Firmware</h2>
 <table>
@@ -472,10 +448,7 @@ void handleExtra(){
   EXTRA_APPEND("\"soe\":%u,\"sekf\":%u,\"msoc\":%u,\"minsoc\":%u,\"v1\":%d,\"v2\":%d,\"cs\":[",
     t.soe,t.socEkf,t.maxSoc,t.minSocEst,t.minV1Est,t.minV2Est);
   for(int i=0;i<14;i++){ EXTRA_APPEND("%u%s",t.cellSoc[i],i<13?",":""); }
-  EXTRA_APPEND("],\"btr\":%u,\"vr2\":%u,\"vr3\":%u,\"mos\":%u,\"vreg\":%u,",
-    t.boardTempRefV,t.vref2,t.vref3,t.mosfetPwrV,t.afeVreg);
-  EXTRA_APPEND("\"ax\":%d,\"ay\":%d,\"az\":%d,\"er\":%d,\"ep\":%d,\"eh\":%d,",
-    t.imuAccX,t.imuAccY,t.imuAccZ,t.eulerRoll,t.eulerPitch,t.eulerHeading);
+  EXTRA_APPEND("],");
   EXTRA_APPEND("\"odo\":%lu,\"bhw\":%u,\"bfw\":[%u,%u,%u],\"cfw\":[%u,%u,%u],\"gfw\":[%u,%u,%u],\"mfw\":[%u,%u,%u],\"bin\":\"%s\"}",
     (unsigned long)t.odometer,t.bmsHwVer,
     t.bmsFw[0],t.bmsFw[1],t.bmsFw[2],t.bcmFw[0],t.bcmFw[1],t.bcmFw[2],
@@ -534,7 +507,7 @@ void IRAM_ATTR applyFrame(Telemetry &t, const twai_message_t &m){
       if(m.data_length_code<4)return;
       t.chargerIV=d[0]|(d[1]<<8)|(d[2]<<16)|((uint32_t)d[3]<<24);
       break;
-    // ===== Cough Cough frames =====
+    
     case 0x136: if(m.data_length_code<8)return; for(int i=0;i<4;i++) t.cellTemp[i]=(int16_t)(d[i*2]+(d[i*2+1]<<8)); break;
     case 0x137: if(m.data_length_code<8)return; t.cellTemp[4]=(int16_t)(d[0]+(d[1]<<8)); t.eftTemp=(int16_t)(d[2]+(d[3]<<8)); t.eciTemp=(int16_t)(d[4]+(d[5]<<8)); t.senseTemp=(int16_t)(d[6]+(d[7]<<8)); break;
     case 0x139: if(m.data_length_code<6)return; t.deratedDsgI=d[0]+(d[1]<<8); t.deratedChgI=d[2]+(d[3]<<8); t.deratedRegenI=d[4]+(d[5]<<8); break;
@@ -546,10 +519,6 @@ void IRAM_ATTR applyFrame(Telemetry &t, const twai_message_t &m){
     case 0x146: if(m.data_length_code<6)return; t.cellSoc[12]=d[0]+(d[1]<<8); t.cellSoc[13]=d[2]+(d[3]<<8); t.maxSoc=d[4]+(d[5]<<8); break;
     case 0x148: if(m.data_length_code<6)return; t.chgCellRule=d[0]+(d[1]<<8); t.chgCmdRateLtd=d[2]+(d[3]<<8); t.chgPostQuant=(int16_t)(d[4]+(d[5]<<8)); break;
     case 0x151: if(m.data_length_code<6)return; t.soe=d[4]+(d[5]<<8); break;
-    case 0x154: if(m.data_length_code<8)return; t.boardTempRefV=d[0]+(d[1]<<8); t.vref2=d[2]+(d[3]<<8); t.vref3=d[4]+(d[5]<<8); t.mosfetPwrV=d[6]+(d[7]<<8); break;
-    case 0x155: if(m.data_length_code<2)return; t.afeVreg=d[0]+(d[1]<<8); break;
-    case 0x110: if(m.data_length_code<6)return; t.imuAccX=(int16_t)(d[0]+(d[1]<<8)); t.imuAccY=(int16_t)(d[2]+(d[3]<<8)); t.imuAccZ=(int16_t)(d[4]+(d[5]<<8)); break;
-    case 0x112: if(m.data_length_code<6)return; t.eulerRoll=(int16_t)(d[0]+(d[1]<<8)); t.eulerPitch=(int16_t)(d[2]+(d[3]<<8)); t.eulerHeading=(int16_t)(d[4]+(d[5]<<8)); break;
     case 0x212: if(m.data_length_code<4)return; t.odometer=d[0]|(d[1]<<8)|(d[2]<<16)|((uint32_t)d[3]<<24); break;
     case 0x162: if(m.data_length_code<7)return; t.bmsHwVer=d[1]; t.bmsFw[0]=d[4]; t.bmsFw[1]=d[5]; t.bmsFw[2]=d[6]; break;
     case 0x107: if(m.data_length_code<7)return; t.bcmFw[0]=d[4]; t.bcmFw[1]=d[5]; t.bcmFw[2]=d[6]; break;
